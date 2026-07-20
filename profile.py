@@ -276,14 +276,22 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     img_data = requests.get(url).content
                     image = Image.open(io.BytesIO(img_data))
                     
-                    # Increased size
-                    width = 72  # Doubled from 36
-                    ratio = image.height / image.width
-                    height = int(width * ratio * 0.6)  # Now ~43 instead of ~21
+                    # Modified for vertical portrait - increased height
+                    # Calculate dimensions for vertical portrait
+                    target_height = 450  # Target height in pixels
+                    ratio = image.width / image.height
+                    width = int(target_height * ratio * 0.6)  # 0.6 accounts for monospace aspect ratio
+                    height = target_height
+                    
+                    # Ensure we don't exceed SVG bounds (adjust if needed)
+                    if width > 80:  # Cap width to prevent overflow
+                        width = 80
+                        height = int(width / (ratio * 0.6))
+                    
                     image = image.resize((width, height)).convert("L")
                     pixels = image.getdata()
                     
-                    # Extended ASCII character set for more detail
+                    # Extended ASCII character set for better detail
                     ASCII_CHARS = ["█", "▓", "▒", "░", "@", "%", "#", "*", "+", "=", "-", ":", ".", " "]
                     if 'dark' in filename:
                         ASCII_CHARS = ASCII_CHARS[::-1]  # Reverse for dark mode
@@ -295,15 +303,21 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                             char_idx = len(ASCII_CHARS) - 1
                         ascii_str += ASCII_CHARS[char_idx]
                     
-                    # Adjusted position for taller image
-                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="35", y="85")
+                    # Adjusted Y position for portrait (moved up to fit the tall image)
+                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="35", y="65")
                     if 'dark' in filename:
                         ascii_text.set('fill', '#c9d1d9')
                     else:
                         ascii_text.set('fill', '#334155')
-                        
+                    
+                    # Use smaller font size for better fitting
+                    font_size = 12  # Slightly smaller for more characters
+                    line_height = 12  # Match font size for tight packing
+                    
                     for i in range(height):
-                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="35", dy="14", style="font-family: monospace; font-size: 14px; letter-spacing: 1px;")
+                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", 
+                                                x="35", dy=str(line_height), 
+                                                style=f"font-family: monospace; font-size: {font_size}px; letter-spacing: 0px;")
                         tspan.text = ascii_str[i * width:(i + 1) * width]
                     
                     parent = img.getparent()
