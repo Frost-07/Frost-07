@@ -269,28 +269,40 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
         justify_format(root, 'loc_add', loc_add_val)
         justify_format(root, 'loc_data', loc_val, 2 + len(loc_val))
         
-        ASCII_CHARS = ["@", "#", "S", "%", "?", "*", "+", ";", ":", ",", "."]
         for img in root.findall('.//{http://www.w3.org/2000/svg}image'):
             url = img.get('href')
             if url and url.startswith('http'):
                 try:
                     img_data = requests.get(url).content
                     image = Image.open(io.BytesIO(img_data))
-                    width = 50
+                    
+                    # Compute perfect aspect ratio using 14px font & 14px line heights (Monospace roughly 0.6w)
+                    width = 36
                     ratio = image.height / image.width
-                    height = int(width * ratio * 0.5)
+                    height = int(width * ratio * 0.6)
                     image = image.resize((width, height)).convert("L")
                     pixels = image.getdata()
-                    ascii_str = "".join([ASCII_CHARS[pixel // 25] for pixel in pixels])
                     
-                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="40", y="125")
+                    # Correct optical texture map
+                    ASCII_CHARS = ["@", "%", "#", "*", "+", "=", "-", ":", ".", " "]
+                    if 'dark' in filename:
+                        ASCII_CHARS = ASCII_CHARS[::-1] # White pixels become '@' for light text
+                        
+                    ascii_str = ""
+                    for pixel in pixels:
+                        char_idx = pixel // 26
+                        if char_idx > 9: char_idx = 9
+                        ascii_str += ASCII_CHARS[char_idx]
+                    
+                    # Position explicitly to avoid overlap with right column (starts at x=390)
+                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="35", y="125")
                     if 'dark' in filename:
                         ascii_text.set('fill', '#c9d1d9')
                     else:
                         ascii_text.set('fill', '#334155')
                         
                     for i in range(height):
-                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="40", dy="10", style="font-family: monospace; font-size: 10px; letter-spacing: 2px;")
+                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="35", dy="14", style="font-family: monospace; font-size: 14px; letter-spacing: 1px;")
                         tspan.text = ascii_str[i * width:(i + 1) * width]
                     
                     parent = img.getparent()
