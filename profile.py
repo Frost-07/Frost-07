@@ -2,6 +2,7 @@ import datetime
 from dateutil import relativedelta
 import requests
 import os
+import base64
 from lxml import etree
 import time
 import hashlib
@@ -251,14 +252,27 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
         tree = etree.parse(filename)
         root = tree.getroot()
         justify_format(root, 'age_data', age_data, 49)
-        justify_format(root, 'commit_data', commit_data, 32)
-        justify_format(root, 'star_data', star_data, 19)
-        justify_format(root, 'repo_data', repo_data, 10)
+        justify_format(root, 'commit_data', commit_data, 22)
+        justify_format(root, 'star_data', star_data, 14)
+        justify_format(root, 'repo_data', repo_data, 6)
         justify_format(root, 'contrib_data', contrib_data)
-        justify_format(root, 'follower_data', follower_data, 19)
-        justify_format(root, 'loc_data', loc_data[2], 26)
+        justify_format(root, 'follower_data', follower_data, 10)
+        justify_format(root, 'loc_data', loc_data[2], 9)
         justify_format(root, 'loc_add', loc_data[0])
         justify_format(root, 'loc_del', loc_data[1], 7)
+        
+        # Convert exterior avatar URLs to base64 to fix blank space issues on GitHub SVGs
+        for img in root.findall('.//{http://www.w3.org/2000/svg}image'):
+            url = img.get('href')
+            if url and url.startswith('http'):
+                try:
+                    img_data = requests.get(url).content
+                    b64_data = base64.b64encode(img_data).decode('utf-8')
+                    img.set('href', f"data:image/png;base64,{b64_data}")
+                except Exception as e:
+                    print(f"Base64 Image conversion failed: {e}")
+                    pass
+        
         tree.write(filename, encoding='utf-8', xml_declaration=True)
     except OSError:
         print(f"Skipping {filename} rewrite as the file was not found.")
