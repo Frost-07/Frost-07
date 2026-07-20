@@ -276,26 +276,27 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     img_data = requests.get(url).content
                     image = Image.open(io.BytesIO(img_data))
                     
-                    # Compute perfect aspect ratio using 14px font & 14px line heights (Monospace roughly 0.6w)
-                    width = 36
+                    # Increased size
+                    width = 72  # Doubled from 36
                     ratio = image.height / image.width
-                    height = int(width * ratio * 0.6)
+                    height = int(width * ratio * 0.6)  # Now ~43 instead of ~21
                     image = image.resize((width, height)).convert("L")
                     pixels = image.getdata()
                     
-                    # Correct optical texture map
-                    ASCII_CHARS = ["@", "%", "#", "*", "+", "=", "-", ":", ".", " "]
+                    # Extended ASCII character set for more detail
+                    ASCII_CHARS = ["█", "▓", "▒", "░", "@", "%", "#", "*", "+", "=", "-", ":", ".", " "]
                     if 'dark' in filename:
-                        ASCII_CHARS = ASCII_CHARS[::-1] # White pixels become '@' for light text
+                        ASCII_CHARS = ASCII_CHARS[::-1]  # Reverse for dark mode
                         
                     ascii_str = ""
                     for pixel in pixels:
-                        char_idx = pixel // 26
-                        if char_idx > 9: char_idx = 9
+                        char_idx = pixel // (256 // len(ASCII_CHARS))
+                        if char_idx >= len(ASCII_CHARS): 
+                            char_idx = len(ASCII_CHARS) - 1
                         ascii_str += ASCII_CHARS[char_idx]
                     
-                    # Position explicitly to avoid overlap with right column (starts at x=390)
-                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="35", y="125")
+                    # Adjusted position for taller image
+                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="35", y="85")
                     if 'dark' in filename:
                         ascii_text.set('fill', '#c9d1d9')
                     else:
