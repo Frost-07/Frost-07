@@ -2,7 +2,8 @@ import datetime
 from dateutil import relativedelta
 import requests
 import os
-import base64
+import io
+from PIL import Image
 from lxml import etree
 import time
 import hashlib
@@ -252,26 +253,51 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
         tree = etree.parse(filename)
         root = tree.getroot()
         justify_format(root, 'age_data', age_data, 49)
-        justify_format(root, 'commit_data', commit_data, 22)
-        justify_format(root, 'star_data', star_data, 14)
-        justify_format(root, 'repo_data', repo_data, 6)
+
+        star_line = f"Repos:....{repo_data} {{Contributed: {contrib_data}}} | Stars:"
+        justify_format(root, 'star_data', star_data, 55 - len(star_line))
+        justify_format(root, 'repo_data', repo_data, 4 + len(str(repo_data)))
         justify_format(root, 'contrib_data', contrib_data)
-        justify_format(root, 'follower_data', follower_data, 10)
-        justify_format(root, 'loc_data', loc_data[2], 9)
-        justify_format(root, 'loc_add', loc_data[0])
-        justify_format(root, 'loc_del', loc_data[1], 7)
+
+        follower_line = f"Commmits:..........{commit_data} | Followers:"
+        justify_format(root, 'follower_data', follower_data, 55 - len(follower_line))
+        justify_format(root, 'commit_data', commit_data, 10 + len(str(commit_data)))
+
+        loc_val, loc_add_val, loc_del_val = str(loc_data[2]), str(loc_data[0]), str(loc_data[1])
+        loc_del_line = f"Lines of Code on GitHub:. {loc_val} ( {loc_add_val}++, -- )"
+        justify_format(root, 'loc_del', loc_del_val, 55 - len(loc_del_line))
+        justify_format(root, 'loc_add', loc_add_val)
+        justify_format(root, 'loc_data', loc_val, 2 + len(loc_val))
         
-        # Convert exterior avatar URLs to base64 to fix blank space issues on GitHub SVGs
+        ASCII_CHARS = ["@", "#", "S", "%", "?", "*", "+", ";", ":", ",", "."]
         for img in root.findall('.//{http://www.w3.org/2000/svg}image'):
             url = img.get('href')
             if url and url.startswith('http'):
                 try:
                     img_data = requests.get(url).content
-                    b64_data = base64.b64encode(img_data).decode('utf-8')
-                    img.set('href', f"data:image/png;base64,{b64_data}")
+                    image = Image.open(io.BytesIO(img_data))
+                    width = 50
+                    ratio = image.height / image.width
+                    height = int(width * ratio * 0.5)
+                    image = image.resize((width, height)).convert("L")
+                    pixels = image.getdata()
+                    ascii_str = "".join([ASCII_CHARS[pixel // 25] for pixel in pixels])
+                    
+                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="40", y="125")
+                    if 'dark' in filename:
+                        ascii_text.set('fill', '#c9d1d9')
+                    else:
+                        ascii_text.set('fill', '#334155')
+                        
+                    for i in range(height):
+                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="40", dy="10", style="font-family: monospace; font-size: 10px; letter-spacing: 2px;")
+                        tspan.text = ascii_str[i * width:(i + 1) * width]
+                    
+                    parent = img.getparent()
+                    parent.insert(parent.index(img), ascii_text)
+                    parent.remove(img)
                 except Exception as e:
-                    print(f"Base64 Image conversion failed: {e}")
-                    pass
+                    print(f"ASCII Image conversion failed: {e}")
         
         tree.write(filename, encoding='utf-8', xml_declaration=True)
     except OSError:
