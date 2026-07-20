@@ -11,6 +11,7 @@ import hashlib
 HEADERS = {'authorization': 'token '+ os.environ['ACCESS_TOKEN']}
 USER_NAME = 'Frost-07'
 QUERY_COUNT = {'user_getter': 0, 'follower_getter': 0, 'graph_repos_stars': 0, 'recursive_loc': 0, 'graph_commits': 0, 'loc_query': 0}
+OWNER_ID = None  # Define as global
 
 def daily_readme(birthday):
     diff = relativedelta.relativedelta(datetime.datetime.today(), birthday)
@@ -43,7 +44,7 @@ def graph_commits(start_date, end_date):
     request = simple_request(graph_commits.__name__, query, variables)
     return int(request.json()['data']['user']['contributionsCollection']['contributionCalendar']['totalContributions'])
 
-def graph_repos_stars(count_type, owner_affiliation, cursor=None, add_loc=0, del_loc=0):
+def graph_repos_stars(count_type, owner_affiliation, cursor=None):
     query_count('graph_repos_stars')
     query = '''
     query ($owner_affiliation: [RepositoryAffiliation], $login: String!, $cursor: String) {
@@ -112,15 +113,16 @@ def recursive_loc(owner, repo_name, data, cache_comment, addition_total=0, delet
     variables = {'repo_name': repo_name, 'owner': owner, 'cursor': cursor}
     request = requests.post('https://api.github.com/graphql', json={'query': query, 'variables':variables}, headers=HEADERS)
     if request.status_code == 200:
-        if request.json()['data']['repository']['defaultBranchRef'] != None:
+        if request.json()['data']['repository']['defaultBranchRef'] is not None:
             return loc_counter_one_repo(owner, repo_name, data, cache_comment, request.json()['data']['repository']['defaultBranchRef']['target']['history'], addition_total, deletion_total, my_commits)
-        else: return 0
-    force_close_file(data, cache_comment)
+        else: 
+            return (0, 0, 0)
     if request.status_code == 403:
         raise Exception('Too many requests! You\'ve hit the anti-abuse limit!')
     raise Exception('recursive_loc() has failed with a', request.status_code, request.text, QUERY_COUNT)
 
 def loc_counter_one_repo(owner, repo_name, data, cache_comment, history, addition_total, deletion_total, my_commits):
+    global OWNER_ID
     for node in history['edges']:
         if node['node']['author']['user'] == OWNER_ID:
             my_commits += 1
@@ -129,7 +131,8 @@ def loc_counter_one_repo(owner, repo_name, data, cache_comment, history, additio
 
     if history['edges'] == [] or not history['pageInfo']['hasNextPage']:
         return addition_total, deletion_total, my_commits
-    else: return recursive_loc(owner, repo_name, data, cache_comment, addition_total, deletion_total, my_commits, history['pageInfo']['endCursor'])
+    else: 
+        return recursive_loc(owner, repo_name, data, cache_comment, addition_total, deletion_total, my_commits, history['pageInfo']['endCursor'])
 
 def loc_query(owner_affiliation, comment_size=0, force_cache=False, cursor=None, edges=[]):
     query_count('loc_query')
@@ -253,20 +256,6 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
         tree = etree.parse(filename)
         root = tree.getroot()
         
-        # Get the SVG viewBox or dimensions
-        viewbox = root.get('viewBox')
-        if viewbox:
-            parts = viewbox.split()
-            if len(parts) == 4:
-                svg_width = int(float(parts[2]))
-                svg_height = int(float(parts[3]))
-            else:
-                svg_width = 500  # Default fallback
-                svg_height = 200
-        else:
-            svg_width = int(float(root.get('width', 500)))
-            svg_height = int(float(root.get('height', 200)))
-        
         justify_format(root, 'age_data', age_data, 49)
 
         star_line = f"Repos:....{repo_data} {{Contributed: {contrib_data}}} | Stars:"
@@ -291,35 +280,27 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     img_data = requests.get(url).content
                     image = Image.open(io.BytesIO(img_data))
                     
-                    # Calculate available space for ASCII art
-                    # Check if there's a group/rect that defines the image area
-                    # Default to using most of the SVG height
-                    available_height = svg_height - 120  # Reserve space for text at top
-                    available_width = 200  # Max width for ASCII art
+                    # Create vertical portrait
+                    width = 60  # Fixed width for portrait
+                    ratio = image.height / image.width
+                    height = int(width * ratio * 0.6)  # 0.6 accounts for monospace
                     
-                    # Calculate dimensions for portrait
-                    target_height = min(450, available_height)  # Target height, capped by SVG
-                    if target_height < 50:
-                        target_height = 50  # Minimum height
+                    # Scale to make it taller (multiply by factor)
+                    scale_factor = 4  # Increase this to make it taller
+                    height = height * scale_factor
                     
-                    ratio = image.width / image.height
-                    # 0.6 accounts for monospace character aspect ratio
-                    width = int(target_height * ratio * 0.6)
-                    
-                    # Ensure width fits within available space
-                    if width > available_width:
-                        width = available_width
-                        height = int(width / (ratio * 0.6))
-                    else:
-                        height = target_height
+                    # Cap height to prevent overflow
+                    if height > 400:
+                        height = 400
+                        width = int(height / (ratio * 0.6))
                     
                     image = image.resize((width, height)).convert("L")
                     pixels = image.getdata()
                     
-                    # Extended ASCII character set for better detail
+                    # ASCII characters for better detail
                     ASCII_CHARS = ["█", "▓", "▒", "░", "@", "%", "#", "*", "+", "=", "-", ":", ".", " "]
                     if 'dark' in filename:
-                        ASCII_CHARS = ASCII_CHARS[::-1]  # Reverse for dark mode
+                        ASCII_CHARS = ASCII_CHARS[::-1]
                         
                     ascii_str = ""
                     for pixel in pixels:
@@ -328,19 +309,16 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                             char_idx = len(ASCII_CHARS) - 1
                         ascii_str += ASCII_CHARS[char_idx]
                     
-                    # Calculate Y position to center the ASCII art vertically
-                    # Start after the text elements (around y=100)
-                    start_y = 65  # Moved up to maximize space
-                    
-                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="35", y=str(start_y))
+                    # Position the ASCII art
+                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="35", y="85")
                     if 'dark' in filename:
                         ascii_text.set('fill', '#c9d1d9')
                     else:
                         ascii_text.set('fill', '#334155')
                     
-                    # Use smaller font size for more characters
-                    font_size = 10  # Even smaller for tall portrait
-                    line_height = 10  # Match font size
+                    # Use smaller font for more characters
+                    font_size = 8
+                    line_height = 8
                     
                     for i in range(height):
                         tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", 
@@ -351,9 +329,6 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     parent = img.getparent()
                     parent.insert(parent.index(img), ascii_text)
                     parent.remove(img)
-                    
-                    # Remove the original image element completely
-                    img.getparent().remove(img)
                     
                 except Exception as e:
                     print(f"ASCII Image conversion failed: {e}")
@@ -428,6 +403,7 @@ def perf_counter(funct, *args):
 
 
 if __name__ == '__main__':
+    global OWNER_ID
     user_data, user_time = perf_counter(user_getter, USER_NAME)
     OWNER_ID, acc_date = user_data
     
