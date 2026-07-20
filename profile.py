@@ -252,6 +252,21 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
     try:
         tree = etree.parse(filename)
         root = tree.getroot()
+        
+        # Get the SVG viewBox or dimensions
+        viewbox = root.get('viewBox')
+        if viewbox:
+            parts = viewbox.split()
+            if len(parts) == 4:
+                svg_width = int(float(parts[2]))
+                svg_height = int(float(parts[3]))
+            else:
+                svg_width = 500  # Default fallback
+                svg_height = 200
+        else:
+            svg_width = int(float(root.get('width', 500)))
+            svg_height = int(float(root.get('height', 200)))
+        
         justify_format(root, 'age_data', age_data, 49)
 
         star_line = f"Repos:....{repo_data} {{Contributed: {contrib_data}}} | Stars:"
@@ -276,17 +291,27 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     img_data = requests.get(url).content
                     image = Image.open(io.BytesIO(img_data))
                     
-                    # Modified for vertical portrait - increased height
-                    # Calculate dimensions for vertical portrait
-                    target_height = 450  # Target height in pixels
-                    ratio = image.width / image.height
-                    width = int(target_height * ratio * 0.6)  # 0.6 accounts for monospace aspect ratio
-                    height = target_height
+                    # Calculate available space for ASCII art
+                    # Check if there's a group/rect that defines the image area
+                    # Default to using most of the SVG height
+                    available_height = svg_height - 120  # Reserve space for text at top
+                    available_width = 200  # Max width for ASCII art
                     
-                    # Ensure we don't exceed SVG bounds (adjust if needed)
-                    if width > 80:  # Cap width to prevent overflow
-                        width = 80
+                    # Calculate dimensions for portrait
+                    target_height = min(450, available_height)  # Target height, capped by SVG
+                    if target_height < 50:
+                        target_height = 50  # Minimum height
+                    
+                    ratio = image.width / image.height
+                    # 0.6 accounts for monospace character aspect ratio
+                    width = int(target_height * ratio * 0.6)
+                    
+                    # Ensure width fits within available space
+                    if width > available_width:
+                        width = available_width
                         height = int(width / (ratio * 0.6))
+                    else:
+                        height = target_height
                     
                     image = image.resize((width, height)).convert("L")
                     pixels = image.getdata()
@@ -303,16 +328,19 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                             char_idx = len(ASCII_CHARS) - 1
                         ascii_str += ASCII_CHARS[char_idx]
                     
-                    # Adjusted Y position for portrait (moved up to fit the tall image)
-                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="35", y="65")
+                    # Calculate Y position to center the ASCII art vertically
+                    # Start after the text elements (around y=100)
+                    start_y = 65  # Moved up to maximize space
+                    
+                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="35", y=str(start_y))
                     if 'dark' in filename:
                         ascii_text.set('fill', '#c9d1d9')
                     else:
                         ascii_text.set('fill', '#334155')
                     
-                    # Use smaller font size for better fitting
-                    font_size = 12  # Slightly smaller for more characters
-                    line_height = 12  # Match font size for tight packing
+                    # Use smaller font size for more characters
+                    font_size = 10  # Even smaller for tall portrait
+                    line_height = 10  # Match font size
                     
                     for i in range(height):
                         tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", 
@@ -323,6 +351,10 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     parent = img.getparent()
                     parent.insert(parent.index(img), ascii_text)
                     parent.remove(img)
+                    
+                    # Remove the original image element completely
+                    img.getparent().remove(img)
+                    
                 except Exception as e:
                     print(f"ASCII Image conversion failed: {e}")
         
