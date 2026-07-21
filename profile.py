@@ -117,7 +117,7 @@ def recursive_loc(owner, repo_name, data, cache_comment, addition_total=0, delet
         else: return 0
     force_close_file(data, cache_comment)
     if request.status_code == 403:
-        raise Exception('Too many requests! You\\'ve hit the anti-abuse limit!')
+        raise Exception("Too many requests! You've hit the anti-abuse limit!")
     raise Exception('recursive_loc() has failed with a', request.status_code, request.text, QUERY_COUNT)
 
 def loc_counter_one_repo(owner, repo_name, data, cache_comment, history, addition_total, deletion_total, my_commits):
