@@ -278,9 +278,9 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     
                     # Crop square avatar to a focused central vertical portrait (1:2 ratio)
                     img_w, img_h = image.size
-                    crop_w = img_h * 0.5
+                    crop_w = int(img_h * 0.5)
                     if crop_w > img_w: crop_w = img_w
-                    left, top = (img_w - crop_w) / 2, 0
+                    left, top = int((img_w - crop_w) / 2), 0
                     right, bottom = left + crop_w, img_h
                     image = image.crop((left, top, right, bottom))
                     
