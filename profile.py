@@ -276,19 +276,25 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     img_data = requests.get(url).content
                     image = Image.open(io.BytesIO(img_data))
                     
-                    # Crop square avatar to a 2:3 vertical portrait filling a wider column bounds!
+                    # Crop square avatar targeting vertical portrait preserving a wider area!
                     img_w, img_h = image.size
-                    crop_w = int(img_h * 0.66)
+                    crop_w = int(img_h * 0.68)
                     if crop_w > img_w: crop_w = img_w
                     left, top = int((img_w - crop_w) / 2), 0
                     right, bottom = left + crop_w, img_h
                     image = image.crop((left, top, right, bottom))
                     
-                    # Layout 30x30 characters. 16px font-size with 16px height gives ~480px height overall.
-                    width = 30
+                    # Layout 34x30 characters. 
+                    width = 34
                     height = 30
                     image = image.resize((width, height)).convert("RGBA")
-                    pixels = image.getdata()
+                    pixels = list(image.getdata())
+                    
+                    # Automatic Chromakey Background Removal! (calculates background color from corners)
+                    corners = [pixels[0], pixels[width-1], pixels[(height-1)*width], pixels[-1]]
+                    bg_r = sum(p[0] for p in corners)/4
+                    bg_g = sum(p[1] for p in corners)/4
+                    bg_b = sum(p[2] for p in corners)/4
                     
                     # Correct optical texture map
                     ASCII_CHARS = ["@", "%", "#", "*", "+", "=", "-", ":", ".", " "]
@@ -297,8 +303,10 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                         
                     ascii_str = ""
                     for r, g, b, a in pixels:
-                        if a < 128:
-                            ascii_str += " " # Background Removal bypass for transparent PNGs!
+                        # Calculate Euclidean color distance from the corner background pixel averages
+                        dist = ((r - bg_r)**2 + (g - bg_g)**2 + (b - bg_b)**2)**0.5
+                        if a < 128 or dist < 42:  # Tolerance threshold for uniform backgrounds
+                            ascii_str += " " # Chroma key background removal!
                         else:
                             gray = int(0.2989 * r + 0.5870 * g + 0.1140 * b)
                             char_idx = gray // 26
@@ -306,14 +314,14 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                             ascii_str += ASCII_CHARS[char_idx]
                     
                     # Position explicitly horizontally centered on the left, full vertical height spanned
-                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="60", y="25")
+                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="20", y="25")
                     if 'dark' in filename:
                         ascii_text.set('fill', '#c9d1d9')
                     else:
                         ascii_text.set('fill', '#334155')
                         
                     for i in range(height):
-                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="60", dy="16", style="font-family: monospace; font-size: 16px; letter-spacing: 1px;")
+                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="20", dy="16", style="font-family: monospace; font-size: 16px;")
                         tspan.text = ascii_str[i * width:(i + 1) * width]
                     
                     parent = img.getparent()
