@@ -178,7 +178,7 @@ def cache_builder(edges, comment_size, force_cache, loc_add=0, loc_del=0):
         os.makedirs('cache', exist_ok=True)
         data = []
         if comment_size > 0:
-            for _ in range(comment_size): data.append('This line is a comment block.\\n')
+            for _ in range(comment_size): data.append('This line is a comment block.\n')
         with open(filename, 'w') as f:
             f.writelines(data)
 
@@ -197,9 +197,9 @@ def cache_builder(edges, comment_size, force_cache, loc_add=0, loc_del=0):
                 if int(commit_count) != edges[index]['node']['defaultBranchRef']['target']['history']['totalCount']:
                     owner, repo_name = edges[index]['node']['nameWithOwner'].split('/')
                     loc = recursive_loc(owner, repo_name, data, cache_comment)
-                    data[index] = repo_hash + ' ' + str(edges[index]['node']['defaultBranchRef']['target']['history']['totalCount']) + ' ' + str(loc[2]) + ' ' + str(loc[0]) + ' ' + str(loc[1]) + '\\n'
+                    data[index] = repo_hash + ' ' + str(edges[index]['node']['defaultBranchRef']['target']['history']['totalCount']) + ' ' + str(loc[2]) + ' ' + str(loc[0]) + ' ' + str(loc[1]) + '\n'
             except TypeError:
-                data[index] = repo_hash + ' 0 0 0 0\\n'
+                data[index] = repo_hash + ' 0 0 0 0\n'
     with open(filename, 'w') as f:
         f.writelines(cache_comment)
         f.writelines(data)
@@ -217,7 +217,7 @@ def flush_cache(edges, filename, comment_size):
     with open(filename, 'w') as f:
         f.writelines(data)
         for node in edges:
-            f.write(hashlib.sha256(node['node']['nameWithOwner'].encode('utf-8')).hexdigest() + ' 0 0 0 0\\n')
+            f.write(hashlib.sha256(node['node']['nameWithOwner'].encode('utf-8')).hexdigest() + ' 0 0 0 0\n')
 
 def add_archive():
     try:
@@ -392,7 +392,7 @@ if __name__ == '__main__':
     OWNER_ID, acc_date = user_data
     
     # Initialize from the config provided during generation
-    age_data, age_time = perf_counter(daily_readme, datetime.datetime(${parseInt(y)}, ${parseInt(m)}, ${parseInt(d)}))
+    age_data, age_time = perf_counter(daily_readme, datetime.datetime(2004, 10, 16))
     
     total_loc, loc_time = perf_counter(loc_query, ['OWNER', 'COLLABORATOR', 'ORGANIZATION_MEMBER'], 7)
     commit_data, commit_time = perf_counter(commit_counter, 7)
