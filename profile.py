@@ -284,8 +284,8 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     right, bottom = left + crop_w, img_h
                     image = image.crop((left, top, right, bottom))
                     
-                    # Layout 36x30 characters. 16px font ≈ 345px wide, centered in 0–375px zone.
-                    width = 36
+                    # Layout 40x30 characters. x=5 keeps tight to left border, fills up to info at x=390.
+                    width = 40
                     height = 30
                     image = image.resize((width, height)).convert("RGBA")
                     pixels = list(image.getdata())
@@ -344,16 +344,15 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                             char_idx = min(len(ASCII_CHARS)-1, gray * len(ASCII_CHARS) // 256)
                             ascii_str += ASCII_CHARS[char_idx]
                     
-                    # Center portrait: 36 chars × 9.6px ≈ 346px wide; center in 375px gives x=15
-                    # Ends at x=361 — safe 29px gap before info column at x=390
-                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="15", y="25")
+                    # x=5: tight to left border. 40 chars × ~9.6px ≈ 384px, ends near info column at x=390.
+                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="5", y="25")
                     if 'dark' in filename:
                         ascii_text.set('fill', '#c9d1d9')
                     else:
                         ascii_text.set('fill', '#334155')
                         
                     for i in range(height):
-                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="15", dy="16", style="font-family: monospace; font-size: 16px;")
+                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="5", dy="16", style="font-family: monospace; font-size: 16px;")
                         tspan.text = ascii_str[i * width:(i + 1) * width]
                     
                     parent = img.getparent()
