@@ -278,14 +278,14 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     
                     # Crop square avatar targeting vertical portrait preserving a wider area!
                     img_w, img_h = image.size
-                    crop_w = int(img_h * 0.68)
+                    crop_w = int(img_h * 0.76)
                     if crop_w > img_w: crop_w = img_w
                     left, top = int((img_w - crop_w) / 2), 0
                     right, bottom = left + crop_w, img_h
                     image = image.crop((left, top, right, bottom))
                     
-                    # Layout 34x30 characters. 
-                    width = 34
+                    # Layout 38x30 characters. 
+                    width = 38
                     height = 30
                     image = image.resize((width, height)).convert("RGBA")
                     pixels = list(image.getdata())
@@ -305,7 +305,8 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     for r, g, b, a in pixels:
                         # Calculate Euclidean color distance from the corner background pixel averages
                         dist = ((r - bg_r)**2 + (g - bg_g)**2 + (b - bg_b)**2)**0.5
-                        if a < 128 or dist < 42:  # Tolerance threshold for uniform backgrounds
+                        # High tolerance threshold for aggressive background removal
+                        if a < 128 or dist < 85:  
                             ascii_str += " " # Chroma key background removal!
                         else:
                             gray = int(0.2989 * r + 0.5870 * g + 0.1140 * b)
