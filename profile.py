@@ -284,8 +284,8 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     right, bottom = left + crop_w, img_h
                     image = image.crop((left, top, right, bottom))
                     
-                    # Layout 38x30 characters. 16px font = ~480px height overall.
-                    width = 42
+                    # Layout 36x30 characters. 16px font ≈ 345px wide, centered in 0–375px zone.
+                    width = 36
                     height = 30
                     image = image.resize((width, height)).convert("RGBA")
                     pixels = list(image.getdata())
@@ -293,7 +293,7 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     # BFS flood-fill background removal seeded from ALL edge pixels.
                     # Handles JPEG compression noise where corner colors vary slightly.
                     from collections import deque
-                    def color_close(c1, c2, tol=40):
+                    def color_close(c1, c2, tol=25):
                         return all(abs(int(c1[i]) - int(c2[i])) <= tol for i in range(3))
                     
                     # Sample the background color from the entire image border (more reliable than 4 corners)
@@ -344,15 +344,16 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                             char_idx = min(len(ASCII_CHARS)-1, gray * len(ASCII_CHARS) // 256)
                             ascii_str += ASCII_CHARS[char_idx]
                     
-                    # Position explicitly horizontally centered on the left, full vertical height spanned
-                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="20", y="25")
+                    # Center portrait: 36 chars × 9.6px ≈ 346px wide; center in 375px gives x=15
+                    # Ends at x=361 — safe 29px gap before info column at x=390
+                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="15", y="25")
                     if 'dark' in filename:
                         ascii_text.set('fill', '#c9d1d9')
                     else:
                         ascii_text.set('fill', '#334155')
                         
                     for i in range(height):
-                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="20", dy="16", style="font-family: monospace; font-size: 16px;")
+                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="15", dy="16", style="font-family: monospace; font-size: 16px;")
                         tspan.text = ascii_str[i * width:(i + 1) * width]
                     
                     parent = img.getparent()
