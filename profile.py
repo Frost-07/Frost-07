@@ -285,7 +285,7 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     image = image.crop((left, top, right, bottom))
                     
                     # Layout 38x30 characters. 16px font = ~480px height overall.
-                    width = 38
+                    width = 42
                     height = 30
                     image = image.resize((width, height)).convert("RGBA")
                     pixels = list(image.getdata())
