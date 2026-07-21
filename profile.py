@@ -290,19 +290,35 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     image = image.resize((width, height)).convert("RGBA")
                     pixels = list(image.getdata())
                     
-                    # BFS flood-fill background removal seeded from all 4 corners.
-                    # Only connected background pixels become blank - face/object stays 100% intact.
+                    # BFS flood-fill background removal seeded from ALL edge pixels.
+                    # Handles JPEG compression noise where corner colors vary slightly.
                     from collections import deque
-                    def color_close(c1, c2, tol=35):
+                    def color_close(c1, c2, tol=40):
                         return all(abs(int(c1[i]) - int(c2[i])) <= tol for i in range(3))
                     
-                    seed_color = pixels[0]  # top-left corner = background reference
+                    # Sample the background color from the entire image border (more reliable than 4 corners)
+                    edge_pixels = []
+                    for x in range(width):  # top & bottom rows
+                        edge_pixels.append(pixels[x])
+                        edge_pixels.append(pixels[(height-1)*width + x])
+                    for y in range(height):  # left & right columns
+                        edge_pixels.append(pixels[y*width])
+                        edge_pixels.append(pixels[y*width + width-1])
+                    # Compute median background color from all edge pixels
+                    bg_r = sorted(p[0] for p in edge_pixels)[len(edge_pixels)//2]
+                    bg_g = sorted(p[1] for p in edge_pixels)[len(edge_pixels)//2]
+                    bg_b = sorted(p[2] for p in edge_pixels)[len(edge_pixels)//2]
+                    bg_color = (bg_r, bg_g, bg_b, 255)
+                    
+                    # Seed BFS from every edge pixel that matches the background
                     bg_mask = [False] * (width * height)
                     queue = deque()
-                    for seed_idx in [0, width-1, (height-1)*width, width*height-1]:
-                        if not bg_mask[seed_idx] and color_close(pixels[seed_idx], seed_color):
-                            bg_mask[seed_idx] = True
-                            queue.append(seed_idx)
+                    for seed_idx, p in enumerate(pixels):
+                        x, y = seed_idx % width, seed_idx // width
+                        if (x == 0 or x == width-1 or y == 0 or y == height-1):
+                            if color_close(p, bg_color):
+                                bg_mask[seed_idx] = True
+                                queue.append(seed_idx)
                     while queue:
                         idx = queue.popleft()
                         x, y = idx % width, idx // width
@@ -310,7 +326,7 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                             nx, ny = x+dx, y+dy
                             if 0 <= nx < width and 0 <= ny < height:
                                 nidx = ny * width + nx
-                                if not bg_mask[nidx] and color_close(pixels[nidx], seed_color):
+                                if not bg_mask[nidx] and color_close(pixels[nidx], bg_color):
                                     bg_mask[nidx] = True
                                     queue.append(nidx)
                     
