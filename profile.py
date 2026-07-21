@@ -392,7 +392,7 @@ if __name__ == '__main__':
     OWNER_ID, acc_date = user_data
     
     # Initialize from the config provided during generation
-    age_data, age_time = perf_counter(daily_readme, datetime.datetime(${y}, ${m}, ${d}))
+    age_data, age_time = perf_counter(daily_readme, datetime.datetime(${parseInt(y)}, ${parseInt(m)}, ${parseInt(d)}))
     
     total_loc, loc_time = perf_counter(loc_query, ['OWNER', 'COLLABORATOR', 'ORGANIZATION_MEMBER'], 7)
     commit_data, commit_time = perf_counter(commit_counter, 7)
