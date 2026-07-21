@@ -11,6 +11,7 @@ import hashlib
 HEADERS = {'authorization': 'token '+ os.environ['ACCESS_TOKEN']}
 USER_NAME = 'Frost-07'
 QUERY_COUNT = {'user_getter': 0, 'follower_getter': 0, 'graph_repos_stars': 0, 'recursive_loc': 0, 'graph_commits': 0, 'loc_query': 0}
+OWNER_ID = None  # Add global variable
 
 def daily_readme(birthday):
     diff = relativedelta.relativedelta(datetime.datetime.today(), birthday)
@@ -114,13 +115,15 @@ def recursive_loc(owner, repo_name, data, cache_comment, addition_total=0, delet
     if request.status_code == 200:
         if request.json()['data']['repository']['defaultBranchRef'] != None:
             return loc_counter_one_repo(owner, repo_name, data, cache_comment, request.json()['data']['repository']['defaultBranchRef']['target']['history'], addition_total, deletion_total, my_commits)
-        else: return 0
-    force_close_file(data, cache_comment)
+        else: 
+            return (0, 0, 0)  # Fixed: return tuple instead of 0
+    # Removed force_close_file call to prevent cache corruption
     if request.status_code == 403:
         raise Exception('Too many requests! You\'ve hit the anti-abuse limit!')
     raise Exception('recursive_loc() has failed with a', request.status_code, request.text, QUERY_COUNT)
 
 def loc_counter_one_repo(owner, repo_name, data, cache_comment, history, addition_total, deletion_total, my_commits):
+    global OWNER_ID  # Add this to use global variable
     for node in history['edges']:
         if node['node']['author']['user'] == OWNER_ID:
             my_commits += 1
@@ -129,7 +132,8 @@ def loc_counter_one_repo(owner, repo_name, data, cache_comment, history, additio
 
     if history['edges'] == [] or not history['pageInfo']['hasNextPage']:
         return addition_total, deletion_total, my_commits
-    else: return recursive_loc(owner, repo_name, data, cache_comment, addition_total, deletion_total, my_commits, history['pageInfo']['endCursor'])
+    else: 
+        return recursive_loc(owner, repo_name, data, cache_comment, addition_total, deletion_total, my_commits, history['pageInfo']['endCursor'])
 
 def loc_query(owner_affiliation, comment_size=0, force_cache=False, cursor=None, edges=[]):
     query_count('loc_query')
@@ -277,21 +281,18 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     image = Image.open(io.BytesIO(img_data))
                     
                     # Adjust width to create taller portrait within 530px height
-                    # Using width=30 gives us more vertical space (makes it taller)
                     width = 30
                     ratio = image.height / image.width
-                    # Calculate height - we want it as tall as possible
                     height = int(width * ratio * 0.6)
                     
-                    # Scale factor to make it taller (using 3.5x for vertical portrait)
+                    # Scale factor to make it taller (3.5x for vertical portrait)
                     scale_factor = 3.5
                     height = int(height * scale_factor)
                     
                     # Cap height to fit within SVG (125 to ~470 = 345px available)
-                    max_height = 320  # Maximum rows we can fit
+                    max_height = 320
                     if height > max_height:
                         height = max_height
-                        # Recalculate width to maintain aspect ratio
                         width = int(height / (ratio * 0.6))
                     
                     image = image.resize((width, height)).convert("L")
@@ -300,7 +301,7 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     # Extended ASCII characters for better detail
                     ASCII_CHARS = ["█", "▓", "▒", "░", "@", "%", "#", "*", "+", "=", "-", ":", ".", " "]
                     if 'dark' in filename:
-                        ASCII_CHARS = ASCII_CHARS[::-1]  # Reverse for dark mode
+                        ASCII_CHARS = ASCII_CHARS[::-1]
                         
                     ascii_str = ""
                     for pixel in pixels:
@@ -309,7 +310,7 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                             char_idx = len(ASCII_CHARS) - 1
                         ascii_str += ASCII_CHARS[char_idx]
                     
-                    # Position the ASCII art - start at y=125 (existing position)
+                    # Position the ASCII art - start at y=125
                     ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="35", y="125")
                     if 'dark' in filename:
                         ascii_text.set('fill', '#c9d1d9')
@@ -404,6 +405,7 @@ def perf_counter(funct, *args):
 
 
 if __name__ == '__main__':
+    global OWNER_ID  # Add this
     user_data, user_time = perf_counter(user_getter, USER_NAME)
     OWNER_ID, acc_date = user_data
     
@@ -428,5 +430,3 @@ if __name__ == '__main__':
 
     svg_overwrite('dark_mode.svg', age_data, commit_data, star_data, repo_data, contrib_data, follower_data, total_loc[:-1])
     svg_overwrite('light_mode.svg', age_data, commit_data, star_data, repo_data, contrib_data, follower_data, total_loc[:-1])
-
-listen this is the working script so lets inc the img height in here
