@@ -284,34 +284,48 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     right, bottom = left + crop_w, img_h
                     image = image.crop((left, top, right, bottom))
                     
-                    # Layout 38x30 characters. 
+                    # Layout 38x30 characters. 16px font = ~480px height overall.
                     width = 38
                     height = 30
                     image = image.resize((width, height)).convert("RGBA")
                     pixels = list(image.getdata())
                     
-                    # Automatic Chromakey Background Removal! (calculates background color from corners)
-                    corners = [pixels[0], pixels[width-1], pixels[(height-1)*width], pixels[-1]]
-                    bg_r = sum(p[0] for p in corners)/4
-                    bg_g = sum(p[1] for p in corners)/4
-                    bg_b = sum(p[2] for p in corners)/4
+                    # BFS flood-fill background removal seeded from all 4 corners.
+                    # Only connected background pixels become blank - face/object stays 100% intact.
+                    from collections import deque
+                    def color_close(c1, c2, tol=35):
+                        return all(abs(int(c1[i]) - int(c2[i])) <= tol for i in range(3))
                     
-                    # Correct optical texture map
-                    ASCII_CHARS = ["@", "%", "#", "*", "+", "=", "-", ":", ".", " "]
+                    seed_color = pixels[0]  # top-left corner = background reference
+                    bg_mask = [False] * (width * height)
+                    queue = deque()
+                    for seed_idx in [0, width-1, (height-1)*width, width*height-1]:
+                        if not bg_mask[seed_idx] and color_close(pixels[seed_idx], seed_color):
+                            bg_mask[seed_idx] = True
+                            queue.append(seed_idx)
+                    while queue:
+                        idx = queue.popleft()
+                        x, y = idx % width, idx // width
+                        for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                            nx, ny = x+dx, y+dy
+                            if 0 <= nx < width and 0 <= ny < height:
+                                nidx = ny * width + nx
+                                if not bg_mask[nidx] and color_close(pixels[nidx], seed_color):
+                                    bg_mask[nidx] = True
+                                    queue.append(nidx)
+                    
+                    # Map foreground pixels to dense ASCII with high contrast
+                    ASCII_CHARS = "@#S%?*+;:,. "
                     if 'dark' in filename:
                         ASCII_CHARS = ASCII_CHARS[::-1]
-                        
+                    
                     ascii_str = ""
-                    for r, g, b, a in pixels:
-                        # Calculate Euclidean color distance from the corner background pixel averages
-                        dist = ((r - bg_r)**2 + (g - bg_g)**2 + (b - bg_b)**2)**0.5
-                        # High tolerance threshold for aggressive background removal
-                        if a < 128 or dist < 85:  
-                            ascii_str += " " # Chroma key background removal!
+                    for idx, (r, g, b, a) in enumerate(pixels):
+                        if a < 50 or bg_mask[idx]:
+                            ascii_str += " "  # Background: blank
                         else:
-                            gray = int(0.2989 * r + 0.5870 * g + 0.1140 * b)
-                            char_idx = gray // 26
-                            if char_idx > 9: char_idx = 9
+                            gray = int(0.2989*r + 0.5870*g + 0.1140*b)
+                            char_idx = min(len(ASCII_CHARS)-1, gray * len(ASCII_CHARS) // 256)
                             ascii_str += ASCII_CHARS[char_idx]
                     
                     # Position explicitly horizontally centered on the left, full vertical height spanned
