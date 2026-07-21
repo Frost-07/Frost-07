@@ -276,40 +276,44 @@ def svg_overwrite(filename, age_data, commit_data, star_data, repo_data, contrib
                     img_data = requests.get(url).content
                     image = Image.open(io.BytesIO(img_data))
                     
-                    # Crop square avatar to a focused central vertical portrait (1:2 ratio)
+                    # Crop square avatar to a 2:3 vertical portrait filling a wider column bounds!
                     img_w, img_h = image.size
-                    crop_w = int(img_h * 0.5)
+                    crop_w = int(img_h * 0.66)
                     if crop_w > img_w: crop_w = img_w
                     left, top = int((img_w - crop_w) / 2), 0
                     right, bottom = left + crop_w, img_h
                     image = image.crop((left, top, right, bottom))
                     
-                    # Compute layout: 26 chars wide, 34 chars tall (gives roughly 476px physical height)
-                    width = 26
-                    height = 34
-                    image = image.resize((width, height)).convert("L")
+                    # Layout 30x30 characters. 16px font-size with 16px height gives ~480px height overall.
+                    width = 30
+                    height = 30
+                    image = image.resize((width, height)).convert("RGBA")
                     pixels = image.getdata()
                     
                     # Correct optical texture map
                     ASCII_CHARS = ["@", "%", "#", "*", "+", "=", "-", ":", ".", " "]
                     if 'dark' in filename:
-                        ASCII_CHARS = ASCII_CHARS[::-1] # White pixels become '@' for light text
+                        ASCII_CHARS = ASCII_CHARS[::-1]
                         
                     ascii_str = ""
-                    for pixel in pixels:
-                        char_idx = pixel // 26
-                        if char_idx > 9: char_idx = 9
-                        ascii_str += ASCII_CHARS[char_idx]
+                    for r, g, b, a in pixels:
+                        if a < 128:
+                            ascii_str += " " # Background Removal bypass for transparent PNGs!
+                        else:
+                            gray = int(0.2989 * r + 0.5870 * g + 0.1140 * b)
+                            char_idx = gray // 26
+                            if char_idx > 9: char_idx = 9
+                            ascii_str += ASCII_CHARS[char_idx]
                     
                     # Position explicitly horizontally centered on the left, full vertical height spanned
-                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="70", y="25")
+                    ascii_text = etree.Element("{http://www.w3.org/2000/svg}text", x="60", y="25")
                     if 'dark' in filename:
                         ascii_text.set('fill', '#c9d1d9')
                     else:
                         ascii_text.set('fill', '#334155')
                         
                     for i in range(height):
-                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="70", dy="14", style="font-family: monospace; font-size: 14px; letter-spacing: 1px;")
+                        tspan = etree.SubElement(ascii_text, "{http://www.w3.org/2000/svg}tspan", x="60", dy="16", style="font-family: monospace; font-size: 16px; letter-spacing: 1px;")
                         tspan.text = ascii_str[i * width:(i + 1) * width]
                     
                     parent = img.getparent()
